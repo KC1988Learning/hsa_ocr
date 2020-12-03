@@ -27,14 +27,14 @@ def reshape_2D_img(img):
         pass
 
 # view image
-def view_img(img):
-    if len(img.shape) == 3:
-        plt.imshow(img)
-        plt.show()
-    elif len(img.shape) == 2:
-        reshaped_img = reshape_2D_img(img)
-        plt.imshow(reshaped_img)
-        plt.show()
+def view_img(img, title=None):
+    if len(img.shape)==2:
+        img = reshape_2D_img(img)
+        
+    plt.imshow(img)
+    if title is not None:
+        plt.title(title, fontsize=15)
+    plt.show()
 
 # convert image to grayscale
 # input image has to be in RGB format
@@ -88,3 +88,30 @@ def crop(img, pt1, pt2):
     elif len(img.shape) == 2:
         return img[Ystart:Yend + 1, Xstart:Xend + 1]
 
+# invert grayscale image (work on reshaped or non-reshaped, uint8 image)
+def invert(gray_img):
+    return cv.bitwise_not(gray_img)
+
+# thresholding grayscale image (work on reshaped or non-reshaped)
+# pixel above threshold will be assigned the top_value
+def thresholding(gray_img, threshold, top_value):
+    return cv.threshold(gray_img, threshold, top_value, cv.THRESH_BINARY)[1]
+
+# resize image by width and scale factor
+def resize(img, width_scale_factor, height_scale_factor):
+    height, width, _ = img.shape
+
+    new_width = int(width * width_scale_factor)
+    new_height = int(height * height_scale_factor)
+
+    return cv.resize(img, (new_width, new_height))
+
+# threshold with color range
+def color_thresholding(img, lower_bound, upper_bound):
+    lower_bound_arr = np.asarray(lower_bound)
+    upper_bound_arr = np.asarray(upper_bound)
+
+    # create mask
+    mask = cv.inRange(img, lower_bound_arr, upper_bound_arr)
+
+    return cv.bitwise_and(img, img, mask=mask)
