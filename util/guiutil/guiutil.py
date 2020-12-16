@@ -3,7 +3,7 @@ from tkinter import ttk
 from tkinter import filedialog as fd
 from PIL import ImageTk, Image
 from tkinter import font
-from util.cvutil import read_img, get_shape, color_thresholding, convert_to_gray, view_img
+from util.cvutil import read_img, get_shape, color_thresholding, convert_to_gray, view_img, getCanny
 import numpy as np
 
 ##############################################################################################################
@@ -169,7 +169,7 @@ class ColorThresholdingFrame(ttk.Frame):
         self.file_selection_frame = ttk.Frame(self)
         self.file_selection_frame.grid(row=0, column=0, sticky='EW')
 
-        ########## Add widgets to frame ##########
+        ############################### Add widgets to frame #############################################
         selection_lbl = ttk.Label(self.file_selection_frame, text="Select image file: ")
         selection_lbl.grid(row=0, column=0, sticky='W')
 
@@ -185,7 +185,7 @@ class ColorThresholdingFrame(ttk.Frame):
         self.img_threshold_frame = ttk.Frame(self) # create the frame for thresholding process
         self.img_threshold_frame.grid(row=1, column=0, sticky='EW')
 
-        ########## Add widgets here #############
+        ################################### Add widgets here #############################################
         ### 1. Add image canvas
         img_height, img_width, _ = get_shape(read_img(self.img_filepath))
         self.img_canvas = tk.Canvas(self.img_threshold_frame, height=img_height, width=img_width)
@@ -219,6 +219,7 @@ class ColorThresholdingFrame(ttk.Frame):
         self.B_low_upper_container = LowerUpperContainer(self.img_threshold_frame, "B-range: ", 0, 255)
         self.B_low_upper_container.grid(row=5, column=0, columnspan=2, sticky='W')
 
+        ############################### CALLBACKS #############################################################
         ### 5. Bind callback to spinning event of the spinbox
         self.R_low_upper_container.get_low_spinbox()["command"]=self.threshold_and_update_img
         self.R_low_upper_container.get_up_spinbox()["command"] = self.threshold_and_update_img
@@ -227,8 +228,16 @@ class ColorThresholdingFrame(ttk.Frame):
         self.B_low_upper_container.get_low_spinbox()["command"] = self.threshold_and_update_img
         self.B_low_upper_container.get_up_spinbox()["command"] = self.threshold_and_update_img
 
+        ### 6. Bind callback to pressing enter on the spinbox
+        self.R_low_upper_container.get_low_spinbox().bind('<Return>', lambda event: self.threshold_and_update_img())
+        self.R_low_upper_container.get_up_spinbox().bind('<Return>', lambda event: self.threshold_and_update_img())
+        self.G_low_upper_container.get_low_spinbox().bind('<Return>', lambda event: self.threshold_and_update_img())
+        self.G_low_upper_container.get_up_spinbox().bind('<Return>', lambda event: self.threshold_and_update_img())
+        self.B_low_upper_container.get_low_spinbox().bind('<Return>', lambda event: self.threshold_and_update_img())
+        self.B_low_upper_container.get_up_spinbox().bind('<Return>', lambda event: self.threshold_and_update_img())
 
-        ########## Bind events to the canvas ############
+
+        ### 6. Bind events to the canvas ############
         self.img_canvas.bind("<Button-1>", self.click_to_locate)
         self.img_canvas.bind("<Motion>", lambda event: self.change_cursor(event, img_height, img_width))
 
@@ -261,20 +270,14 @@ class ColorThresholdingFrame(ttk.Frame):
         RGB_low = (self.R_low_upper_container.get_low_value(),
                    self.G_low_upper_container.get_low_value(),
                    self.B_low_upper_container.get_low_value())
-        print(RGB_low)
         RGB_up = (self.R_low_upper_container.get_up_value(),
                    self.G_low_upper_container.get_up_value(),
                    self.B_low_upper_container.get_up_value())
-        print(RGB_up)
 
         self.imgcv = color_thresholding(self.imgcv_original, RGB_low, RGB_up)
         self.img = ImageTk.PhotoImage(image=Image.fromarray(self.imgcv))
         self.img_canvas.itemconfig(self.img_on_canvas,
                                    image=self.img)
-        # self.imgcv = convert_to_gray(self.imgcv)
-        # self.img = ImageTk.PhotoImage(Image.fromarray(self.imgcv))
-        # self.img_canvas.itemconfig(self.img_on_canvas, image=self.img)
-
 
 class LowerUpperContainer(ttk.Frame):
     def __init__(self, container, name, min, max, **kwargs):
@@ -312,6 +315,134 @@ class LowerUpperContainer(ttk.Frame):
     def get_up_spinbox(self):
         return self.up_spinbox
 
+class GetCannyEdge(ttk.Frame):
+    def __init__(self, container, **kwargs):
+        super().__init__(container, **kwargs)
+
+        ############# declare variables #######################
+        self.functional_frame=None
+        #######################################################
+
+        self.select_img_file()
+        self.selection_frame.grid(row=0, column=0, sticky='EW')
+
+    def select_img_file(self):
+        self.selection_frame = ttk.Frame(self)
+
+        ###################### add widgets to frame ######################
+        selection_lbl= ttk.Label(self.selection_frame, text="Select image: ")
+        selection_lbl.grid(row=0, column=0, sticky='W')
+
+        selection_btn = ttk.Button(self.selection_frame, text="Select",
+                                   command=self.create_canny_edge_frame)
+        selection_btn.grid(row=0, column=1, sticky='W')
+
+    def create_canny_edge_frame(self):
+        # create functional frame
+        if self.functional_frame is not None:
+            self.functional_frame.grid_forget()
+
+        self.functional_frame = ttk.Frame(self)
+        self.functional_frame.grid(row=1, column=0, sticky='EW')
+
+        # activate dialog to select image file
+        self.select_img()
+
+        # get image height and width
+        img_height, img_width, _ = get_shape(self.imgcv)
+
+        # create image canvas
+        self.canvas = tk.Canvas(self.functional_frame, height=img_height,
+                                width=img_width)
+        self.canvas_img = self.canvas.create_image(0,0, anchor='nw',
+                                                   image=self.img)
+        self.canvas.grid(row=0, column=0, sticky='EW')
+
+        # create scale frame for lower threshold
+        self.scale_frame_low = ScrollForValueContainer(self.functional_frame, 0, 255,
+                                title="Lower threshold", discrete=True)
+        self.scale_frame_low.scale_bar['command'] = lambda event : self.get_canny_edge()
+        self.scale_frame_low.grid(row=1, column=0, sticky='EW')
+
+        # create scale frame for higher threshold
+        self.scale_frame_high = ScrollForValueContainer(self.functional_frame, 0, 255,
+                                                        title="Higher threshold", discrete=True)
+        self.scale_frame_high.scale_bar['command'] = lambda event : self.get_canny_edge()
+        self.scale_frame_high.grid(row=2, column=0, sticky='EW')
+
+    def select_img(self):
+        img_filepath = fd.askopenfile()
+        if img_filepath is not None:
+            self.img_filepath = img_filepath.name
+            self.imgcv = convert_to_gray(read_img(img_filepath.name), reshape=True)
+            self.imgcv_original = convert_to_gray(read_img(img_filepath.name), reshape=True)
+            self.img = ImageTk.PhotoImage(Image.fromarray(self.imgcv))
+        else:
+            pass
+
+    def get_canny_edge(self):
+        min_val = int(self.scale_frame_low.get_scale_bar().get())
+        max_val = int(self.scale_frame_high.get_scale_bar().get())
+        self.imgcv = getCanny(self.imgcv_original, min_val, max_val)
+        self.img = ImageTk.PhotoImage(Image.fromarray(self.imgcv))
+
+        self.canvas.itemconfig(self.canvas_img,
+                                   image=self.img)
+
+
+    def show_value_low(self):
+        self.current_value_low.set(str(self.scale_bar_low.get()))
+
+    def show_value_high(self):
+        self.current_value_high.set(str(self.scale_bar_high.get()))
+
+
+class ScrollForValueContainer(ttk.Frame):
+    def __init__(self, container, low_val, up_val, title=None, discrete=True, **kwargs):
+        super().__init__(container, **kwargs)
+        self.title = title
+        self.low_val = low_val
+        self.up_val = up_val
+        self.discrete = discrete
+
+        if self.discrete:
+            self.low_val = int(np.round(self.low_val))
+            self.up_val = int(np.round(self.up_val))
+
+        ############## create widget here ##############
+        row_index = 0
+        if self.title is not None:
+            self.title_lbl = ttk.Label(self, text=f"Variable name: {self.title}")
+            self.title_lbl.grid(row=row_index, column=0, columnspan=2, sticky='W')
+            row_index += 1
+
+        self.scale_bar = ttk.Scale(self, from_=self.low_val, to=self.up_val)
+        self.scale_bar.grid(row=row_index, column=0, columnspan=2, sticky='EW')
+        row_index += 1
+
+        self.display_title = ttk.Label(self, text="Current value: ")
+        self.display_title.grid(row=row_index, column=0, sticky='W')
+
+        self.display_value = ttk.Label(self)
+        self.display_value.grid(row=row_index, column=1, sticky='W')
+
+    # def get_display(self, event):
+    #     self.accept_integer()
+    #     self.display.set(f"{self.scale_bar.get():.3f}")
+    #
+    # def accept_integer(self):
+    #     value = self.scale_bar.get()
+    #     if self.discrete:
+    #         if int(value) != value:
+    #             self.scale_bar.set(round(value))
+    #     else:
+    #         pass
+
+    def get_scale_bar(self):
+        return self.scale_bar
+
+    def get_display_value(self):
+        return self.display_value
 
 
 if __name__ == "__main__":
@@ -323,11 +454,12 @@ if __name__ == "__main__":
     # root.title(select_pixel_panel.title)
     # root.mainloop()
 
-    root = tk.Tk()
-    root.configure(background='#ffffff')
-    color_threshold_frame = ColorThresholdingFrame(root)
-    color_threshold_frame.grid()
-    root.mainloop()
+    # root = tk.Tk()
+    # root.configure(background='#ffffff')
+    # color_threshold_frame = ColorThresholdingFrame(root)
+    # color_threshold_frame.grid()
+    # root.mainloop()
+
 
     # def add_lower():
     #     total.set(some_spinbox_1.get_low_value() +
@@ -346,5 +478,10 @@ if __name__ == "__main__":
     # some_label = ttk.Label(root, textvariable=total)
     # some_label.grid()
     # root.mainloop()
+
+    root = tk.Tk()
+    get_canny = GetCannyEdge(root)
+    get_canny.grid()
+    root.mainloop()
 
 

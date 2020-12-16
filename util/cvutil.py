@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 from PIL import Image
+import copy
 
 # read and obtain the numpy array of the image
 def read_img(img_path):
@@ -115,3 +116,75 @@ def color_thresholding(img, lower_bound, upper_bound):
     mask = cv.inRange(img, lower_bound_arr, upper_bound_arr)
 
     return cv.bitwise_and(img, img, mask=mask)
+
+# erode with kernel
+def erode(img, kernel, **kwargs):
+    return cv.erode(img, kernel, **kwargs)
+
+# dilate with kernel
+def dilate(img, kernel, **kwargs):
+    return cv.dilate(img, kernel, **kwargs)
+
+# open with kernel
+def opening(img, kernel, **kwargs):
+    return cv.morphologyEx(img, cv.MORPH_OPEN, kernel, **kwargs)
+
+# closing with kernel
+def closing(img, kernel, **kwargs):
+    return cv.morphologyEx(img, cv.MORPH_CLOSE, kernel, **kwargs)
+
+# canny edge detection
+def getCanny(img, min_val, max_val):
+    if len(img.shape)==2:
+        img = reshape_2D_img(img)
+    # print(f"Min value: {min_val}, Max value: {max_val}")
+    return cv.Canny(img, min_val, max_val)
+
+# find contours of grayscale image
+def findContours(bin_img, **kwargs):
+    bin_img_copy = copy.deepcopy(bin_img)
+    if kwargs == {}:
+        contours, hierarchy = cv.findContours(bin_img_copy, cv.RETR_TREE,
+                                              cv.CHAIN_APPROX_SIMPLE)
+    else:
+        contours, hierarchy = cv.findContours(bin_img_copy, **kwargs)
+
+    return contours
+
+# draw contours on an image
+def drawContours(img, contours, **kwargs):
+    if len(img.shape) == 2:
+        img = reshape_2D_img(img)
+
+    img_copy = copy.deepcopy(img)
+
+    if kwargs == {}:
+        contour_img = cv.drawContours(img_copy, contours, -1, (255, 0, 0), 2)
+    else:
+        contour_img = cv.drawContours(img_copy, contours, **kwargs)
+
+    return contour_img
+
+# blur image
+def blurring(img, mode=None, kernel_size=None, **kwargs):
+    if kernel_size is None:
+        kernel_size = 5
+
+    if mode is None:
+        mode = 'averaging'
+
+    if mode == 'averaging':
+        return cv.blur(img, (kernel_size, kernel_size))
+    elif mode == 'gaussian':
+        if kwargs == {}:
+            kwargs['sigmaX'] = 0
+            kwargs['sigmaY'] = 0
+        return cv.GaussianBlur(img, (kernel_size, kernel_size), **kwargs)
+    elif mode == 'median':
+        return cv.medianBlur(img, kernel_size)
+    elif mode == 'bilateral':
+        if kwargs == {}:
+            kwargs['d'] = 9
+            kwargs['sigmaColor'] = 100
+            kwargs['sigmaSpace'] = 100
+        return cv.bilateralFilter(img, **kwargs)
